@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ColumnDef, flexRender, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table';
+import { X } from 'lucide-react';
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[];
@@ -50,8 +51,17 @@ export function DataTable<TData, TValue>({
 
     return (
         <>
-            <div className="flex items-center py-4">
-                <Input placeholder="Search..." value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)} className="max-w-sm" />
+            <div className="relative max-w-sm py-4">
+                <Input placeholder="Search..." value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)} className="pr-10" />
+                {search && (
+                    <button
+                        type="button"
+                        onClick={() => onSearch?.('')}
+                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
             </div>
 
             <div className="rounded-md border">
