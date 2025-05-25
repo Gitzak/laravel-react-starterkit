@@ -40,6 +40,9 @@ export function DataTable<TData, TValue>({
     });
 
     const handleSort = (columnId: string) => {
+        const column = table.getAllColumns().find((col) => col.id === columnId);
+        if (!column?.columnDef.enableSorting) return;
+
         if (!onSort) return;
         const newDirection = sort === columnId && direction === 'asc' ? 'desc' : 'asc';
         onSort(columnId, newDirection);
@@ -62,9 +65,17 @@ export function DataTable<TData, TValue>({
                                     const sortIcon = direction === 'asc' ? '↑' : '↓';
 
                                     return (
-                                        <TableHead key={header.id} onClick={() => handleSort(columnId)} className="cursor-pointer select-none">
+                                        <TableHead
+                                            key={header.id}
+                                            onClick={() => handleSort(columnId)}
+                                            className={`select-none ${
+                                                header.column.columnDef.enableSorting === false ? 'cursor-default' : 'cursor-pointer'
+                                            }`}
+                                        >
                                             {flexRender(header.column.columnDef.header, header.getContext())}
-                                            {isSorted && <span className="ml-1">{sortIcon}</span>}
+                                            {header.column.columnDef.enableSorting !== false && (
+                                                <span className="ml-1 text-xs">{isSorted ? (direction === 'asc' ? '↑' : '↓') : '⇅'}</span>
+                                            )}
                                         </TableHead>
                                     );
                                 })}
