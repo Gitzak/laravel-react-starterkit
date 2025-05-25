@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ColumnDef, flexRender, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table';
@@ -17,6 +18,7 @@ interface DataTableProps<TData, TValue> {
     perPage?: number;
     total?: number;
     onPageChange?: (page: number) => void;
+    onPerPageChange?: (value: number) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -27,11 +29,12 @@ export function DataTable<TData, TValue>({
     sort,
     direction,
     onSort,
-    currentPage,
-    lastPage,
-    perPage,
-    total,
+    currentPage = 1,
+    lastPage = 1,
+    perPage = 10,
+    total = 0,
     onPageChange,
+    onPerPageChange,
 }: DataTableProps<TData, TValue>) {
     const table = useReactTable({
         data,
@@ -42,37 +45,55 @@ export function DataTable<TData, TValue>({
 
     const handleSort = (columnId: string) => {
         const column = table.getAllColumns().find((col) => col.id === columnId);
-        if (!column?.columnDef.enableSorting) return;
-
-        if (!onSort) return;
+        if (!column?.columnDef.enableSorting || !onSort) return;
         const newDirection = sort === columnId && direction === 'asc' ? 'desc' : 'asc';
         onSort(columnId, newDirection);
     };
 
     return (
         <>
-            <div className="relative max-w-sm py-4">
-                <Input placeholder="Search..." value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)} className="pr-10" />
-                {search && (
-                    <button
-                        type="button"
-                        onClick={() => onSearch?.('')}
-                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                )}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-2 py-4">
+                <div className="relative w-full max-w-sm">
+                    <Input placeholder="Search..." value={search ?? ''} onChange={(e) => onSearch?.(e.target.value)} className="pr-10" />
+                    {search && (
+                        <button
+                            type="button"
+                            onClick={() => onSearch?.('')}
+                            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            View
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+                        {table
+                            .getAllColumns()
+                            .filter((col) => col.getCanHide())
+                            .map((col) => (
+                                <DropdownMenuCheckboxItem key={col.id} checked={col.getIsVisible()} onCheckedChange={() => col.toggleVisibility()}>
+                                    {col.id}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             <div className="rounded-md border">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-secondary">
                         {table.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
+                            <TableRow className="rounded-t-md [&>th:first-child]:rounded-tl-md [&>th:last-child]:rounded-tr-md" key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => {
                                     const columnId = header.column.id;
                                     const isSorted = sort === columnId;
-                                    const sortIcon = direction === 'asc' ? '↑' : '↓';
 
                                     return (
                                         <TableHead
@@ -113,11 +134,21 @@ export function DataTable<TData, TValue>({
                 </Table>
             </div>
 
-            {/* Pagination and showing info */}
-            {typeof currentPage !== 'undefined' && typeof perPage !== 'undefined' && typeof total !== 'undefined' && (
-                <div className="flex items-center justify-between px-2 py-6">
-                    <div className="text-muted-foreground text-sm">
-                        Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, total)} of {total} results
+            <div className="flex items-center justify-between px-2 py-6">
+                <div className="text-muted-foreground text-sm">
+                    Showing {(currentPage - 1) * perPage + 1} to {Math.min(currentPage * perPage, total)} of {total} results
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm">Rows per page:</span>
+                        <select className="rounded border p-1 text-sm" value={perPage} onChange={(e) => onPerPageChange?.(Number(e.target.value))}>
+                            {[5, 10, 20, 50, 100].map((size) => (
+                                <option key={size} value={size}>
+                                    {size}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="flex gap-1">
@@ -126,7 +157,13 @@ export function DataTable<TData, TValue>({
                         </Button>
 
                         {Array.from({ length: lastPage || 1 }, (_, i) => i + 1).map((page) => (
-                            <Button key={page} size="sm" variant={page === currentPage ? 'default' : 'outline'} onClick={() => onPageChange?.(page)}>
+                            <Button
+                                key={page}
+                                size="sm"
+                                className="min-w-[40px]"
+                                variant={page === currentPage ? 'default' : 'outline'}
+                                onClick={() => onPageChange?.(page)}
+                            >
                                 {page}
                             </Button>
                         ))}
@@ -136,7 +173,7 @@ export function DataTable<TData, TValue>({
                         </Button>
                     </div>
                 </div>
-            )}
+            </div>
         </>
     );
 }
