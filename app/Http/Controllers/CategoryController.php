@@ -35,12 +35,27 @@ class CategoryController extends Controller
             ->paginate($request->input('per_page', 10))
             ->withQueryString();
 
+        $pagination = [
+            'current_page' => $categories->currentPage(),
+            'last_page'    => $categories->lastPage(),
+            'per_page'     => $categories->perPage(),
+            'total'        => $categories->total(),
+        ];
+
         $parentCategories = Category::with('children')->whereNull('parent_id')->get();
 
         return Inertia::render('categories/index', [
-            'categories' => $categories,
+            'categories'       => $categories,
+            'pagination'       => $pagination,
             'parentCategories' => $parentCategories,
-            'filters' => $request->only(['search', 'is_active', 'sort', 'direction', 'page', 'per_page']),
+            'filters'          => $request->only([
+                'search',
+                'is_active',
+                'sort',
+                'direction',
+                'page',
+                'per_page'
+            ]),
         ]);
     }
 
@@ -60,7 +75,7 @@ class CategoryController extends Controller
     }
 
     public function update(UpdateCategoryRequest $request, Category $category)
-    {        
+    {
         $category->update([
             'name'        => $request->name,
             'description' => $request->description,

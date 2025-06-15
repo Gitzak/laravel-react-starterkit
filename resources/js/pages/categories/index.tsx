@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import AppLayout from '@/layouts/app-layout';
 import { PaginatedCategories, SharedData } from '@/types';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import CreateCategoryForm from './partials/create';
@@ -11,108 +11,81 @@ import { DataTable } from './partials/datatable/data-table';
 import { DeleteCategoryModal } from './partials/delete';
 import EditCategoryForm from './partials/update';
 
+type Query = {
+    search?: string;
+    sort?: string;
+    direction?: 'asc' | 'desc';
+    page?: number;
+    per_page?: number;
+    is_active?: string | null;
+};
+
+type Pagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+};
+
 export default function CategoriesPage({
     categories,
+    pagination,
     parentCategories,
-    filters,
+    filters: initialFilters,
 }: {
     categories: PaginatedCategories;
+    pagination: Pagination; 
     parentCategories: any[];
-    filters: {
-        search?: string;
-        sort?: string;
-        direction?: string;
-        page?: number;
-    };
+    filters: Query;
 }) {
-    const page = usePage<SharedData>();
-    const success = page.props.flash.success;
-    const error = page.props.flash.error;
-
-    const [open, setOpen] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
-
-    const { data, setData } = useForm({
-        search: filters.search ?? '',
+    const [query, setQuery] = useState<Query>({
+        ...initialFilters,
+        search: initialFilters.search ?? '',
+        per_page: initialFilters.per_page ?? pagination.per_page,
+        page: initialFilters.page ?? pagination.current_page,
     });
 
-    const hasMounted = useRef(false);
+    const page = usePage<SharedData>();
+    const hasMount = useRef(false);
+    const { success, error } = page.props.flash;
 
     useEffect(() => {
+        if (!hasMount.current) {
+            hasMount.current = true;
+            return;
+        }
         if (success) toast.success(success);
         if (error) toast.error(error);
     }, [success, error]);
 
-    useEffect(() => {
-        if (!hasMounted.current) {
-            hasMounted.current = true;
-            return;
-        }
-
-        const timeout = setTimeout(() => {
-            router.get(
-                '/categories',
-                {
-                    ...filters,
-                    page: 1,
-                    search: data.search,
-                    sort: filters.sort,
-                    direction: filters.direction,
-                },
-                {
-                    preserveScroll: true,
-                    preserveState: true,
-                },
-            );
-        }, 800);
-
-        return () => clearTimeout(timeout);
-    }, [data.search]);
-
-    const handleSort = (column: string, direction: 'asc' | 'desc') => {
-        router.get(
-            '/categories',
-            {
-                ...filters,
-                page: 1,
-                search: data.search,
-                sort: column,
-                direction,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-            },
-        );
+    const refresh = (patch: Partial<Query>) => {
+        const next = { ...query, ...patch };
+        setQuery(next);
+        router.get('/categories', next, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
 
-    const handlePageChange = (page: number) => {
-        router.get(
-            '/categories',
-            {
-                ...filters,
-                page,
-                search: data.search,
-                sort: filters.sort,
-                direction: filters.direction,
-            },
-            {
-                preserveScroll: true,
-                preserveState: true,
-            },
-        );
-    };
+    const handleSearch        = (v: string) => refresh({ search: v, page: 1 });
+    const handleSort          = (c: string, d: 'asc' | 'desc') => refresh({ sort: c, direction: d, page: 1 });
+    const handlePageChange    = (p: number) => refresh({ page: p });
+    const handlePerPageChange = (n: number) => refresh({ per_page: n, page: 1 });
 
-    const openEdit = (category: Category) => setSelectedCategory(category);
-    const openDelete = (id: number) => setDeleteId(id);
-    const openView = (category: Category) => console.log('View:', category);
+    const [openCreate, setOpenCreate] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+    const [deleteId, setDeleteId] = useState<number | null>(null);
+
     const closeModals = () => {
         setSelectedCategory(null);
         setDeleteId(null);
     };
 
-    const columns = baseColumns(openView, openEdit, openDelete);
+    const columns = baseColumns(
+        (cat) => console.log('View:', cat),
+        (cat) => setSelectedCategory(cat),
+        (id) => setDeleteId(id),
+    );
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Categories', href: '/categories' }]}>
@@ -121,17 +94,16 @@ export default function CategoriesPage({
             <div className="mb-4 flex items-center justify-between p-4">
                 <h1 className="text-xl font-bold">Categories</h1>
 
-                <Sheet open={open} onOpenChange={setOpen}>
+                <Sheet open={openCreate} onOpenChange={setOpenCreate}>
                     <SheetTrigger asChild>
-                        <Button variant="default">+ Add Category</Button>
+                        <Button>+ Add Category</Button>
                     </SheetTrigger>
                     <SheetContent side="right" className="flex h-screen w-[400px] flex-col sm:w-[480px]">
                         <SheetHeader className="border-b p-6">
                             <SheetTitle>Create Category</SheetTitle>
                             <SheetDescription>Fill the form to create a new category</SheetDescription>
                         </SheetHeader>
-
-                        <CreateCategoryForm parentCategories={parentCategories} onCancel={() => setOpen(false)} />
+                        <CreateCategoryForm parentCategories={parentCategories} onCancel={() => setOpenCreate(false)} />
                     </SheetContent>
                 </Sheet>
             </div>
@@ -140,16 +112,14 @@ export default function CategoriesPage({
                 <DataTable
                     columns={columns}
                     data={categories.data}
-                    search={data.search}
-                    onSearch={(value) => setData('search', value)}
-                    sort={filters.sort}
-                    direction={filters.direction as 'asc' | 'desc'}
+                    search={query.search}
+                    onSearch={handleSearch}
+                    sort={query.sort}
+                    direction={query.direction as 'asc' | 'desc'}
                     onSort={handleSort}
-                    currentPage={categories.current_page}
-                    lastPage={categories.last_page}
-                    perPage={categories.per_page}
-                    total={categories.total}
+                    pagination={pagination}
                     onPageChange={handlePageChange}
+                    onPerPageChange={handlePerPageChange}
                 />
             </div>
 
@@ -165,7 +135,7 @@ export default function CategoriesPage({
                 </Sheet>
             )}
 
-            {deleteId && <DeleteCategoryModal categoryId={deleteId} open={true} onClose={closeModals} />}
+            {deleteId && <DeleteCategoryModal categoryId={deleteId} open onClose={closeModals} />}
         </AppLayout>
     );
 }
